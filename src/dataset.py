@@ -34,9 +34,9 @@ def _get_(self,idx):
     
     labels = self.tokenizer(
         caption,
-        padding="max_Length"
-        truncation= True
-        max_Length = self.max_length
+        padding="max_Length",
+        truncation= True,
+        max_Length = self.max_length,
         return_tensors="pt"
     ).imput_ids.squeeze(0)
     

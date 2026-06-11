@@ -13,4 +13,7 @@ epochs = 4
 batch_size = 16
 lr = 3e-4 
 
+def train():
+    model,feature_extractor,tokenizer
+
 
