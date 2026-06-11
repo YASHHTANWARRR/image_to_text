@@ -33,6 +33,15 @@ def _get_(self,idx):
                                     return_tensors="pt").pixel_values.squeeze(0)
     
     labels = self.tokenizer(
-        
-    )
+        caption,
+        padding="max_Length"
+        truncation= True
+        max_Length = self.max_length
+        return_tensors="pt"
+    ).imput_ids.squeeze(0)
+    
+    return {
+        "labels": labels,
+        "pixel_values": pixel_values
+    }
     
