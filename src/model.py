@@ -2,8 +2,7 @@ from transformers import (
     VisionEncoderDecoderModel,
     ViTImageProcessor,
     AutoTokenizer)
-import torch
-import PIL
+
 
 model_name = "nlpconnect/vit-gpt2-image-cpationing"
 
