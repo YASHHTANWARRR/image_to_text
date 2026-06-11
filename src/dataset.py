@@ -6,7 +6,7 @@ import PIL
 from PIL import Image
 
 import torch
-from torch.utils.data import dataset
+from torch.utils.data import Dataset,Dataloader
 
 from sklearn.model_selection import train_test_split
 
@@ -117,3 +117,70 @@ def create_splits(
     
     return (train_df,val_df,test_df)
 
+
+#data loaders  
+def create_dataLoaders(
+    caption_file,
+    img_dir,
+    processor,
+    tokenizer,
+    batch_size=6,
+    maxlength=64,
+    num_workers=4
+):
+    
+    df = load_dataframe(caption_file)
+    
+    (train_df,
+        val_df,
+        test_df)=create_splits(df)
+    
+    train_dataset=FlickrDataset(
+        train_df,
+        img_dir,
+        tokenizer,
+        processor,
+        maxlength
+    )
+    
+    val_dataset= FlickrDataset(
+        val_df,
+        img_dir,
+        tokenizer,
+        processor,
+        maxlength
+    )
+    
+    test_dataset = FlickrDataset(
+        test_df,
+        img_dir,
+        tokenizer,
+        processor,
+        maxlength
+    )
+    
+    train_loader = Dataloader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    
+    val_loader = Dataloader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    
+    test_loader = Dataloader(
+        test_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+    
+    return(train_loader,val_loader,test_loader) 
