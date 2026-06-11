@@ -3,11 +3,14 @@ import numpy as np
 import pandas as pd 
 import PIL
 
+from PIL import Image
+
 import torch
 from torch.utils.data import dataset
 
 from sklearn.model_selection import train_test_split
 
+#dataset class being called in train.py
 class FlickrDataset(dataset):
     
     def _init_(self,dataframe,img_dir,tokenizer,feature_extractor,
@@ -67,4 +70,50 @@ def load_dataframe(caption_file):
                         .str.strip()
                         )
     
+    return df
+
+#splitting of dataset 
+def create_splits(
+    df,
+    train_splits=0.8,
+    val_splits=0.1,
+    random_states=42
+):
+    unique_images = (df["images"]
+                        .unique())
     
+    train_imgs, temp_imgs=(
+        train_test_split(
+            temp_imgs,
+            train_size=train_splits,
+            val_splits=val_splits,
+            random_states=random_states
+        )
+    )
+    
+    val_imgs, test_imgs=(
+        train_test_split(
+            temp_imgs,
+            test_size=0.5,
+            random_state=random_states
+            
+        )
+    )
+    
+    train_df=(
+        df[df["images"].isin(train_imgs)]
+            .reset_index(drop=True)
+    )
+    
+    val_df=(
+        df[df["images"].isin(val_imgs)]
+        .reset_index(drop=True)
+    )
+    
+    test_df=(
+        df[df["images"].isin(test_imgs)]
+        .reset_index(drop=True)
+    )
+    
+    return (train_df,val_df,test_df)
+
