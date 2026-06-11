@@ -1,3 +1,4 @@
+import os 
 import numpy as np 
 import pandas as pd 
 import PIL
@@ -5,11 +6,13 @@ import PIL
 import torch
 from torch.utils.data import dataset
 
+from sklearn.model_selection import train_test_split
+
 class FlickrDataset(dataset):
     
-    def _init_(self,img_dir,csv_file,tokenizer,feature_extractor,
+    def _init_(self,dataframe,img_dir,tokenizer,feature_extractor,
                 maxlength=64):
-        self.df = pd.read_csv(csv_file)
+        self.df = dataframe.reset_index(drop=True)
         
         self.image_dir = img_dir 
         
@@ -23,11 +26,12 @@ class FlickrDataset(dataset):
         return len(self,df)
 
     def _get_(self,idx):
-        image_path= (
-            f"{self.img_dir}/"
-            f"{self.df.iloc[idx]["image"]}"
-        )
-        caption = self.df.iloc[idx][caption]
+        image_name = self.df.iloc[idx]["image"]
+        
+        caption = self.df.iloc[idx]["caption"]
+        
+        image_path = os.path.join(self.img_dir,
+                                    image_name)
         
         image = Image.open(image_path).conver("RGB")
         
@@ -42,8 +46,25 @@ class FlickrDataset(dataset):
             return_tensors="pt"
         ).imput_ids.squeeze(0)
         
+        labels [labels==self.tokenizer.pad_token_id,
+                ]=-100
+        
         return {
             "labels": labels,
             "pixel_values": pixel_values
         }
+
+def load_dataframe(caption_file):
+    
+    df = pd.read_csv(caption_file,
+                        skipinitialspace=True)
+    
+    df.columns=["images",
+                "captions"]
+    
+    df["captions"] = (df["caption"]
+                        .astype(str)
+                        .str.strip()
+                        )
+    
     
