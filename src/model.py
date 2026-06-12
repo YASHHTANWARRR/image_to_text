@@ -37,7 +37,9 @@ class ImageCaptionModel:
         )
 
         self.model.config.decoder_start_token_id = (
-            self.tokenizer.bos_token_id
+            self.tokenizer.cls_token_id
+            if self.tokenizer.cls_token_id is not None
+            else self.tokenizer.bos_token_id
         )
 
         self.model.config.eos_token_id = (
