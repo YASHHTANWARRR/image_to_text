@@ -6,8 +6,7 @@ from transformers import (
     AutoTokenizer
 )
 
-
-MODEL_NAME = "nlpconnect/vit-gpt2-image-captioning"
+model_name = "nlpconnect/vit-gpt2-image-captioning"
 
 
 class ImageCaptionModel:
@@ -16,17 +15,17 @@ class ImageCaptionModel:
 
         self.model = (
             VisionEncoderDecoderModel
-            .from_pretrained(MODEL_NAME)
+            .from_pretrained(model_name)
         )
 
         self.processor = (
             ViTImageProcessor
-            .from_pretrained(MODEL_NAME)
+            .from_pretrained(model_name)
         )
 
         self.tokenizer = (
             AutoTokenizer
-            .from_pretrained(MODEL_NAME)
+            .from_pretrained(model_name)
         )
 
         self.tokenizer.pad_token = (

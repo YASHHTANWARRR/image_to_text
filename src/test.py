@@ -33,7 +33,7 @@ class Evaluator:
         self,
         checkpoint_path,
         caption_file,
-        image_dir
+        img_dir
     ):
 
         self.generator = (
@@ -42,7 +42,7 @@ class Evaluator:
             )
         )
 
-        self.image_dir = image_dir
+        self.image_dir = img_dir
 
         df = load_dataframe(
             caption_file
