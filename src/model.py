@@ -220,3 +220,10 @@ class ImageCaptionModel:
             .parameters()
         ):
             param.requires_grad = True
+
+def freeze_encoder(self):
+
+    for param in self.model.encoder.parameters():
+        param.requires_grad = False
+
+    print("Encoder frozen")

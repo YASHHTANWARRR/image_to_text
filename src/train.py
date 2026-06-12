@@ -48,6 +48,7 @@ class Trainer:
         self.caption_model = (
             ImageCaptionModel()
         )
+        self.caption_model.freeze_encoder()
 
         (
             self.model,
