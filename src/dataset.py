@@ -1,186 +1,218 @@
-import os 
-import numpy as np 
-import pandas as pd 
-import PIL
+import os
+import pandas as pd
 
 from PIL import Image
 
 import torch
-from torch.utils.data import Dataset,DataLoader
+from torch.utils.data import Dataset, DataLoader
 
 from sklearn.model_selection import train_test_split
 
-#dataset class being called in train.py
 class FlickrDataset(Dataset):
-    
-    def _init_(self,dataframe,img_dir,tokenizer,feature_extractor,
-                maxlength=64):
+
+    def __init__(
+        self,
+        dataframe,
+        image_dir,
+        processor,
+        tokenizer,
+        max_length=64
+    ):
+
         self.df = dataframe.reset_index(drop=True)
-        
-        self.image_dir = img_dir 
-        
+
+        self.image_dir = image_dir
+
+        self.processor = processor
+
         self.tokenizer = tokenizer
-        
-        self.feature_extractor = feature_extractor
-        
-        self.max_length = maxlength
 
-    def _len_(self):
-        return len(self,df)
+        self.max_length = max_length
 
-    def _get_(self,idx):
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+
         image_name = self.df.iloc[idx]["image"]
-        
+
         caption = self.df.iloc[idx]["caption"]
-        
-        image_path = os.path.join(self.img_dir,
-                                    image_name)
-        
-        image = Image.open(image_path).conver("RGB")
-        
-        pixel_values= feature_extractor(images=image,
-                                        return_tensors="pt").pixel_values.squeeze(0)
-        
+
+        image_path = os.path.join(
+            self.image_dir,
+            image_name
+        )
+
+        image = Image.open(
+            image_path
+        ).convert("RGB")
+
+        pixel_values = self.processor(
+            images=image,
+            return_tensors="pt"
+        ).pixel_values.squeeze(0)
+
         labels = self.tokenizer(
             caption,
-            padding="max_Length",
-            truncation= True,
-            max_Length = self.max_length,
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_length,
             return_tensors="pt"
-        ).imput_ids.squeeze(0)
-        
-        labels [labels==self.tokenizer.pad_token_id,
-                ]=-100
-        
+        ).input_ids.squeeze(0)
+
+        labels[
+            labels == self.tokenizer.pad_token_id
+        ] = -100
+
         return {
-            "labels": labels,
-            "pixel_values": pixel_values
+            "pixel_values": pixel_values,
+            "labels": labels
         }
 
-def load_dataframe(caption_file):
-    
-    df = pd.read_csv(caption_file,
-                        skipinitialspace=True)
-    
-    df.columns=["images",
-                "captions"]
-    
-    df["captions"] = (df["caption"]
-                        .astype(str)
-                        .str.strip()
-                        )
-    
+
+def load_dataframe(
+    caption_file
+):
+
+    df = pd.read_csv(
+        caption_file,
+        skipinitialspace=True
+    )
+
+    df.columns = [
+        "image",
+        "caption"
+    ]
+
+    df["caption"] = (
+        df["caption"]
+        .astype(str)
+        .str.strip()
+    )
+
     return df
 
-#splitting of dataset 
+
 def create_splits(
     df,
-    train_splits=0.8,
-    val_splits=0.1,
-    random_states=42
+    train_ratio=0.8,
+    val_ratio=0.1,
+    random_state=42
 ):
-    unique_images = (df["images"]
-                        .unique())
-    
-    train_imgs, temp_imgs=(
+
+    unique_images = (
+        df["image"]
+        .unique()
+    )
+
+    train_imgs, temp_imgs = (
         train_test_split(
-            temp_imgs,
-            train_size=train_splits,
-            val_splits=val_splits,
-            random_states=random_states
+            unique_images,
+            train_size=train_ratio,
+            random_state=random_state
         )
     )
-    
-    val_imgs, test_imgs=(
+
+    val_imgs, test_imgs = (
         train_test_split(
             temp_imgs,
             test_size=0.5,
-            random_state=random_states
-            
+            random_state=random_state
         )
     )
-    
-    train_df=(
-        df[df["images"].isin(train_imgs)]
-            .reset_index(drop=True)
-    )
-    
-    val_df=(
-        df[df["images"].isin(val_imgs)]
+
+    train_df = (
+        df[df["image"].isin(train_imgs)]
         .reset_index(drop=True)
     )
-    
-    test_df=(
-        df[df["images"].isin(test_imgs)]
+
+    val_df = (
+        df[df["image"].isin(val_imgs)]
         .reset_index(drop=True)
     )
-    
-    return (train_df,val_df,test_df)
+
+    test_df = (
+        df[df["image"].isin(test_imgs)]
+        .reset_index(drop=True)
+    )
+
+    return (
+        train_df,
+        val_df,
+        test_df
+    )
 
 
-#data loaders  
 def create_dataloaders(
     caption_file,
-    img_dir,
+    image_dir,
     processor,
     tokenizer,
-    batch_size=6,
-    maxlength=64,
+    batch_size=4,
+    max_length=64,
     num_workers=4
 ):
-    
-    df = load_dataframe(caption_file)
-    
-    (train_df,
-        val_df,
-        test_df)=create_splits(df)
-    
-    train_dataset=FlickrDataset(
+
+    df = load_dataframe(
+        caption_file
+    )
+
+    (
         train_df,
-        img_dir,
-        tokenizer,
-        processor,
-        maxlength
-    )
-    
-    val_dataset= FlickrDataset(
         val_df,
-        img_dir,
-        tokenizer,
+        test_df
+    ) = create_splits(df)
+
+    train_dataset = FlickrDataset(
+        train_df,
+        image_dir,
         processor,
-        maxlength
+        tokenizer,
+        max_length
     )
-    
+
+    val_dataset = FlickrDataset(
+        val_df,
+        image_dir,
+        processor,
+        tokenizer,
+        max_length
+    )
+
     test_dataset = FlickrDataset(
         test_df,
-        img_dir,
-        tokenizer,
+        image_dir,
         processor,
-        maxlength
+        tokenizer,
+        max_length
     )
-    
-    train_loader = Dataloader(
+
+    train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True
     )
-    
-    val_loader = Dataloader(
+
+    val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=num_workers,
         pin_memory=True
     )
-    
-    test_loader = Dataloader(
+
+    test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=num_workers,
         pin_memory=True
     )
-    
-    return(train_loader,val_loader,test_loader) 
+
+    return (
+        train_loader,
+        val_loader,
+        test_loader
+    )

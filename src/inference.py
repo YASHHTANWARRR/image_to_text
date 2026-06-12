@@ -1,5 +1,3 @@
-# inference.py
-
 import torch
 
 from PIL import Image
