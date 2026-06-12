@@ -6,12 +6,12 @@ import PIL
 from PIL import Image
 
 import torch
-from torch.utils.data import Dataset,Dataloader
+from torch.utils.data import Dataset,DataLoader
 
 from sklearn.model_selection import train_test_split
 
 #dataset class being called in train.py
-class FlickrDataset(dataset):
+class FlickrDataset(Dataset):
     
     def _init_(self,dataframe,img_dir,tokenizer,feature_extractor,
                 maxlength=64):
@@ -119,7 +119,7 @@ def create_splits(
 
 
 #data loaders  
-def create_dataLoaders(
+def create_dataloaders(
     caption_file,
     img_dir,
     processor,
