@@ -17,47 +17,24 @@ from torch.cuda.amp import (
 from dataset import create_dataloaders
 from model import ImageCaptionModel
 
-
 CONFIG = {
-
-    "caption_file":
-        "data/captions.txt",
-
-    "image_dir":
-        "data/images",
-
-    "batch_size":
-        4,
-
-    "epochs":
-        10,
-
-    "lr":
-        5e-5,
-
-    "max_length":
-        64,
-
-    "num_workers":
-        4,
-
-    "patience":
-        3,
-
-    "checkpoint_dir":
-        "checkpoints",
-
-    "resume":
-        False
+    "caption_file":"/home/hornet/dataset_folders/archive/captions.txt",
+    "image_dir":"/home/hornet/dataset_folders/archive/Images/flickr30k_images",
+    "batch_size":1,
+    "epochs":10,
+    "lr":5e-5,
+    "max_length":32,
+    "num_workers":4,
+    "patience":3,
+    "checkpoint_dir":"checkpoints",
+    "resume":False
 }
-
 
 DEVICE = torch.device(
     "cuda"
     if torch.cuda.is_available()
     else "cpu"
 )
-
 
 class Trainer:
 
