@@ -1,212 +1,171 @@
-import os
 import json
+import torch
 
 from tqdm import tqdm
 
-import evaluate
-
-from PIL import Image
-
-from dataset import (
-    load_dataframe,
-    create_splits
-)
-
-from inference import (
-    CaptionGenerator
-)
+from model import ImageCaptionModel
+from dataset import create_dataloaders
 
 
-RESULTS_DIR = "results"
+CONFIG = {
 
-os.makedirs(
-    RESULTS_DIR,
-    exist_ok=True
+    "caption_file":
+    "/home/hornet/dataset_folders/archive/captions.txt",
+
+    "image_dir":
+    "/home/hornet/dataset_folders/archive/Images/flickr30k_images",
+
+    "batch_size": 4,
+
+    "max_length": 32,
+
+    "num_workers": 2
+}
+
+
+DEVICE = torch.device(
+    "cuda"
+    if torch.cuda.is_available()
+    else "cpu"
 )
 
 
 class Evaluator:
 
-    def __init__(
-        self,
-        checkpoint_path,
-        caption_file,
-        image_dir
-    ):
+    def __init__(self):
 
-        self.generator = (
-            CaptionGenerator(
-                checkpoint_path
-            )
+        caption_model = (
+            ImageCaptionModel()
         )
 
-        self.image_dir = image_dir
-
-        df = load_dataframe(
-            caption_file
+        (
+            self.model,
+            self.processor
+        ) = (
+            caption_model
+            .get_components()
         )
+
+        checkpoint = torch.load(
+            "checkpoints/best_model.pt",
+            map_location=DEVICE
+        )
+
+        self.model.load_state_dict(
+            checkpoint[
+                "model_state_dict"
+            ]
+        )
+
+        self.model.to(
+            DEVICE
+        )
+
+        self.model.eval()
 
         (
             _,
             _,
-            self.test_df
-        ) = create_splits(df)
-
-        self.bleu = evaluate.load(
-            "bleu"
-        )
-
-        self.meteor = evaluate.load(
-            "meteor"
-        )
-
-        self.rouge = evaluate.load(
-            "rouge"
+            self.test_loader
+        ) = create_dataloaders(
+            CONFIG["caption_file"],
+            CONFIG["image_dir"],
+            self.processor,
+            batch_size=
+            CONFIG["batch_size"],
+            max_length=
+            CONFIG["max_length"],
+            num_workers=
+            CONFIG["num_workers"]
         )
 
     def evaluate(self):
 
         predictions = []
 
-        references = []
+        with torch.no_grad():
 
-        sample_outputs = []
-
-        print(
-            "Running Evaluation..."
-        )
-
-        for _, row in tqdm(
-            self.test_df.iterrows(),
-            total=len(self.test_df)
-        ):
-
-            image_name = row["image"]
-
-            reference = row["caption"]
-
-            image_path = os.path.join(
-                self.image_dir,
-                image_name
+            progress = tqdm(
+                self.test_loader,
+                desc="Testing"
             )
 
-            prediction = (
-                self.generator.predict(
-                    image_path
+            for batch in progress:
+
+                pixel_values = (
+                    batch["pixel_values"]
+                    .to(DEVICE)
                 )
-            )
 
-            predictions.append(
-                prediction
-            )
+                generated_ids = (
+                    self.model.generate(
+                        pixel_values=
+                        pixel_values,
 
-            references.append(
-                [reference]
-            )
+                        max_length=30,
 
-            sample_outputs.append(
-                {
-                    "image":
-                    image_name,
+                        num_beams=4
+                    )
+                )
 
-                    "prediction":
-                    prediction,
+                generated_text = (
+                    self.processor.batch_decode(
+                        generated_ids,
+                        skip_special_tokens=True
+                    )
+                )
 
-                    "reference":
-                    reference
-                }
-            )
+                predictions.extend(
+                    generated_text
+                )
 
-        bleu_score = (
-            self.bleu.compute(
-                predictions=predictions,
-                references=references
-            )
+        return predictions
+
+    def save_predictions(
+        self,
+        predictions
+    ):
+
+        import os
+
+        os.makedirs(
+            "results",
+            exist_ok=True
         )
-
-        meteor_score = (
-            self.meteor.compute(
-                predictions=predictions,
-                references=[
-                    r[0]
-                    for r in references
-                ]
-            )
-        )
-
-        rouge_score = (
-            self.rouge.compute(
-                predictions=predictions,
-                references=[
-                    r[0]
-                    for r in references
-                ]
-            )
-        )
-
-        metrics = {
-
-            "BLEU":
-                bleu_score,
-
-            "METEOR":
-                meteor_score,
-
-            "ROUGE":
-                rouge_score
-        }
 
         with open(
-            f"{RESULTS_DIR}/metrics.json",
+            "results/predictions.json",
             "w"
         ) as f:
 
             json.dump(
-                metrics,
+                predictions,
                 f,
                 indent=4
             )
-
-        with open(
-            f"{RESULTS_DIR}/predictions.json",
-            "w"
-        ) as f:
-
-            json.dump(
-                sample_outputs[:100],
-                f,
-                indent=4
-            )
-
-        print(
-            "\nEvaluation Complete"
-        )
-
-        print(
-            json.dumps(
-                metrics,
-                indent=4
-            )
-        )
-
-        return metrics
 
 
 def main():
 
-    evaluator = Evaluator(
-
-        checkpoint_path=
-        "checkpoints/best_model.pt",
-
-        caption_file=
-        "data/captions.txt",
-
-        image_dir=
-        "data/images"
+    evaluator = (
+        Evaluator()
     )
 
-    evaluator.evaluate()
+    predictions = (
+        evaluator.evaluate()
+    )
+
+    evaluator.save_predictions(
+        predictions
+    )
+
+    print(
+        "\nSaved predictions to:"
+    )
+
+    print(
+        "results/predictions.json"
+    )
 
 
 if __name__ == "__main__":

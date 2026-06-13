@@ -19,31 +19,17 @@ class CaptionGenerator:
         checkpoint_path
     ):
 
-        self.caption_model = (
+        caption_model = (
             ImageCaptionModel()
         )
 
         (
             self.model,
-            self.processor,
-            self.tokenizer
+            self.processor
         ) = (
-            self.caption_model
+            caption_model
             .get_components()
         )
-
-        self.model.to(DEVICE)
-
-        self.load_checkpoint(
-            checkpoint_path
-        )
-
-        self.model.eval()
-
-    def load_checkpoint(
-        self,
-        checkpoint_path
-    ):
 
         checkpoint = torch.load(
             checkpoint_path,
@@ -56,28 +42,29 @@ class CaptionGenerator:
             ]
         )
 
-        print(
-            f"Loaded checkpoint:"
-            f" {checkpoint_path}"
+        self.model.to(
+            DEVICE
         )
+
+        self.model.eval()
 
     def predict(
         self,
         image_path,
-        max_length=32,
+        max_length=30,
         num_beams=4
     ):
 
-        image = Image.open(
-            image_path
-        ).convert("RGB")
+        image = (
+            Image.open(image_path)
+            .convert("RGB")
+        )
 
-        pixel_values = (
+        inputs = (
             self.processor(
-                images=image,
+                image,
                 return_tensors="pt"
             )
-            .pixel_values
             .to(DEVICE)
         )
 
@@ -85,150 +72,48 @@ class CaptionGenerator:
 
             generated_ids = (
                 self.model.generate(
-                    pixel_values,
+                    **inputs,
                     max_length=max_length,
-                    num_beams=num_beams,
-                    early_stopping=True
+                    num_beams=num_beams
                 )
             )
 
         caption = (
-            self.tokenizer.decode(
+            self.processor.decode(
                 generated_ids[0],
                 skip_special_tokens=True
             )
         )
 
         return caption
-
-    def predict_topk(
-        self,
-        image_path,
-        max_length=32,
-        top_k=50
-    ):
-
-        image = Image.open(
-            image_path
-        ).convert("RGB")
-
-        pixel_values = (
-            self.processor(
-                images=image,
-                return_tensors="pt"
-            )
-            .pixel_values
-            .to(DEVICE)
-        )
-
-        with torch.no_grad():
-
-            generated_ids = (
-                self.model.generate(
-                    pixel_values,
-                    max_length=max_length,
-                    do_sample=True,
-                    top_k=top_k
-                )
-            )
-
-        caption = (
-            self.tokenizer.decode(
-                generated_ids[0],
-                skip_special_tokens=True
-            )
-        )
-
-        return caption
-
-    def predict_topp(
-        self,
-        image_path,
-        max_length=32,
-        top_p=0.9
-    ):
-
-        image = Image.open(
-            image_path
-        ).convert("RGB")
-
-        pixel_values = (
-            self.processor(
-                images=image,
-                return_tensors="pt"
-            )
-            .pixel_values
-            .to(DEVICE)
-        )
-
-        with torch.no_grad():
-
-            generated_ids = (
-                self.model.generate(
-                    pixel_values,
-                    max_length=max_length,
-                    do_sample=True,
-                    top_p=top_p
-                )
-            )
-
-        caption = (
-            self.tokenizer.decode(
-                generated_ids[0],
-                skip_special_tokens=True
-            )
-        )
-
-        return caption
-
-    def batch_predict(
-        self,
-        image_paths
-    ):
-
-        predictions = []
-
-        for image_path in image_paths:
-
-            caption = self.predict(
-                image_path
-            )
-
-            predictions.append(
-                {
-                    "image":
-                    image_path,
-
-                    "caption":
-                    caption
-                }
-            )
-
-        return predictions
 
 
 def main():
 
-    generator = CaptionGenerator(
-        checkpoint_path=
-        "checkpoints/best_model.pt"
-    )
-
-    image_path = input(
-        "Enter image path: "
-    )
-
-    caption = (
-        generator.predict(
-            image_path
+    generator = (
+        CaptionGenerator(
+            "checkpoints/best_model.pt"
         )
     )
 
-    print(
-        "\nGenerated Caption:"
-    )
+    while True:
 
-    print(caption)
+        image_path = input(
+            "\nImage Path (q to quit): "
+        )
+
+        if image_path.lower() == "q":
+            break
+
+        caption = (
+            generator.predict(
+                image_path
+            )
+        )
+
+        print(
+            f"\nCaption:\n{caption}"
+        )
 
 
 if __name__ == "__main__":

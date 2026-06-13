@@ -3,10 +3,15 @@ import pandas as pd
 
 from PIL import Image
 
-import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import (
+    Dataset,
+    DataLoader
+)
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import (
+    train_test_split
+)
+
 
 class FlickrDataset(Dataset):
 
@@ -15,58 +20,71 @@ class FlickrDataset(Dataset):
         dataframe,
         image_dir,
         processor,
-        tokenizer,
-        max_length=64
+        max_length=32
     ):
 
-        self.df = dataframe.reset_index(drop=True)
+        self.df = (
+            dataframe
+            .reset_index(drop=True)
+        )
 
         self.image_dir = image_dir
 
         self.processor = processor
 
-        self.tokenizer = tokenizer
-
         self.max_length = max_length
 
     def __len__(self):
+
         return len(self.df)
 
     def __getitem__(self, idx):
 
-        image_name = self.df.iloc[idx]["image"]
+        image_name = (
+            self.df.iloc[idx]["image"]
+        )
 
-        caption = self.df.iloc[idx]["caption"]
+        caption = (
+            self.df.iloc[idx]["caption"]
+        )
 
         image_path = os.path.join(
             self.image_dir,
             image_name
         )
 
-        image = Image.open(
-            image_path
-        ).convert("RGB")
+        image = (
+            Image.open(image_path)
+            .convert("RGB")
+        )
 
-        pixel_values = self.processor(
-            images=image,
-            return_tensors="pt"
-        ).pixel_values.squeeze(0)
-
-        labels = self.tokenizer(
-            caption,
-            padding="max_length",
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt"
-        ).input_ids.squeeze(0)
-
-        labels[
-            labels == self.tokenizer.pad_token_id
-        ] = -100
+        encoding = (
+            self.processor(
+                images=image,
+                text=caption,
+                padding="max_length",
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt"
+            )
+        )
 
         return {
-            "pixel_values": pixel_values,
-            "labels": labels
+
+            "pixel_values":
+            encoding[
+                "pixel_values"
+            ].squeeze(0),
+
+            "input_ids":
+            encoding[
+                "input_ids"
+            ].squeeze(0),
+
+            "attention_mask":
+            encoding[
+                "attention_mask"
+            ].squeeze(0)
         }
 
 
@@ -122,17 +140,26 @@ def create_splits(
     )
 
     train_df = (
-        df[df["image"].isin(train_imgs)]
+        df[
+            df["image"]
+            .isin(train_imgs)
+        ]
         .reset_index(drop=True)
     )
 
     val_df = (
-        df[df["image"].isin(val_imgs)]
+        df[
+            df["image"]
+            .isin(val_imgs)
+        ]
         .reset_index(drop=True)
     )
 
     test_df = (
-        df[df["image"].isin(test_imgs)]
+        df[
+            df["image"]
+            .isin(test_imgs)
+        ]
         .reset_index(drop=True)
     )
 
@@ -147,10 +174,9 @@ def create_dataloaders(
     caption_file,
     image_dir,
     processor,
-    tokenizer,
     batch_size=4,
-    max_length=64,
-    num_workers=4
+    max_length=32,
+    num_workers=2
 ):
 
     df = load_dataframe(
@@ -167,7 +193,6 @@ def create_dataloaders(
         train_df,
         image_dir,
         processor,
-        tokenizer,
         max_length
     )
 
@@ -175,7 +200,6 @@ def create_dataloaders(
         val_df,
         image_dir,
         processor,
-        tokenizer,
         max_length
     )
 
@@ -183,7 +207,6 @@ def create_dataloaders(
         test_df,
         image_dir,
         processor,
-        tokenizer,
         max_length
     )
 
@@ -209,6 +232,21 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True
+    )
+
+    print(
+        f"Train Samples: "
+        f"{len(train_dataset)}"
+    )
+
+    print(
+        f"Validation Samples: "
+        f"{len(val_dataset)}"
+    )
+
+    print(
+        f"Test Samples: "
+        f"{len(test_dataset)}"
     )
 
     return (

@@ -4,37 +4,37 @@ import torch
 from tqdm import tqdm
 
 from torch.optim import AdamW
+from torch.amp import autocast, GradScaler
 
 from transformers import (
     get_linear_schedule_with_warmup
 )
 
-from torch.cuda.amp import (
-    autocast,
-    GradScaler
-)
-
 from dataset import create_dataloaders
 from model import ImageCaptionModel
 
+
 CONFIG = {
+
     "caption_file":"/home/hornet/dataset_folders/archive/captions.txt",
     "image_dir":"/home/hornet/dataset_folders/archive/Images/flickr30k_images",
-    "batch_size":1,
-    "epochs":10,
-    "lr":5e-5,
-    "max_length":32,
-    "num_workers":4,
-    "patience":3,
-    "checkpoint_dir":"checkpoints",
-    "resume":False
+    "batch_size": 1,
+    "epochs": 5,
+    "lr": 1e-5,
+    "max_length": 32,
+    "num_workers": 0,
+    "patience": 3,
+    "checkpoint_dir":
+    "checkpoints"
 }
+
 
 DEVICE = torch.device(
     "cuda"
     if torch.cuda.is_available()
     else "cpu"
 )
+
 
 class Trainer:
 
@@ -48,18 +48,43 @@ class Trainer:
         self.caption_model = (
             ImageCaptionModel()
         )
-        self.caption_model.freeze_encoder()
 
         (
             self.model,
-            self.processor,
-            self.tokenizer
+            self.processor
         ) = (
             self.caption_model
             .get_components()
         )
 
         self.model.to(DEVICE)
+
+        self.caption_model.freeze_all_except_lm_head()
+        
+        print("Only LM Head Trainable")
+
+        self.model.gradient_checkpointing_enable()
+
+        trainable = (
+            self.caption_model
+            .count_trainable_parameters()
+        )
+
+        total = sum(
+            p.numel()
+            for p in self.model.parameters()
+        )
+
+        print(
+            f"Trainable Parameters: "
+            f"{trainable:,}"
+        )
+
+        print(
+            f"Total Parameters: "
+            f"{total:,}"
+        )
+    
 
         (
             self.train_loader,
@@ -69,14 +94,16 @@ class Trainer:
             CONFIG["caption_file"],
             CONFIG["image_dir"],
             self.processor,
-            self.tokenizer,
-            CONFIG["batch_size"],
-            CONFIG["max_length"],
-            CONFIG["num_workers"]
+            batch_size=CONFIG["batch_size"],
+            max_length=CONFIG["max_length"],
+            num_workers=CONFIG["num_workers"]
         )
-
+        
         self.optimizer = AdamW(
-            self.model.parameters(),
+            filter(
+                lambda p: p.requires_grad,
+                self.model.parameters()
+            ),
             lr=CONFIG["lr"]
         )
 
@@ -93,11 +120,9 @@ class Trainer:
             )
         )
 
-        self.scaler = GradScaler()
+        self.scaler = GradScaler("cuda")
 
         self.best_loss = float("inf")
-
-        self.start_epoch = 0
 
     def train_epoch(self):
 
@@ -117,21 +142,35 @@ class Trainer:
                 .to(DEVICE)
             )
 
-            labels = (
-                batch["labels"]
+            input_ids = (
+                batch["input_ids"]
                 .to(DEVICE)
             )
 
-            self.optimizer.zero_grad()
+            attention_mask = (
+                batch["attention_mask"]
+                .to(DEVICE)
+            )
 
-            with autocast():
+            self.optimizer.zero_grad(
+                set_to_none=True
+            )
+
+            with autocast("cuda"):
 
                 outputs = self.model(
+
                     pixel_values=
                     pixel_values,
 
+                    input_ids=
+                    input_ids,
+
+                    attention_mask=
+                    attention_mask,
+
                     labels=
-                    labels
+                    input_ids
                 )
 
                 loss = outputs.loss
@@ -139,15 +178,6 @@ class Trainer:
             self.scaler.scale(
                 loss
             ).backward()
-
-            self.scaler.unscale_(
-                self.optimizer
-            )
-
-            torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(),
-                1.0
-            )
 
             self.scaler.step(
                 self.optimizer
@@ -190,19 +220,31 @@ class Trainer:
                     .to(DEVICE)
                 )
 
-                labels = (
-                    batch["labels"]
+                input_ids = (
+                    batch["input_ids"]
                     .to(DEVICE)
                 )
 
-                with autocast():
+                attention_mask = (
+                    batch["attention_mask"]
+                    .to(DEVICE)
+                )
+
+                with autocast("cuda"):
 
                     outputs = self.model(
+
                         pixel_values=
                         pixel_values,
 
+                        input_ids=
+                        input_ids,
+
+                        attention_mask=
+                        attention_mask,
+
                         labels=
-                        labels
+                        input_ids
                     )
 
                     loss = (
@@ -232,7 +274,6 @@ class Trainer:
         self.caption_model.save_checkpoint(
             checkpoint_path,
             self.optimizer,
-            self.scheduler,
             epoch,
             val_loss
         )
@@ -242,7 +283,6 @@ class Trainer:
         patience_counter = 0
 
         for epoch in range(
-            self.start_epoch,
             CONFIG["epochs"]
         ):
 
